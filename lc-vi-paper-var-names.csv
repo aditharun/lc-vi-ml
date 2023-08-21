@@ -1,0 +1,98 @@
+original_names,new_names,proper_names
+anxiety,anxiety,Anxiety
+confusion,confusion,Confusion
+brainfog,brain fog,Brain fog
+doom,doom,Feelings of impending doom
+memory,memory,Memory problems
+speech,speech,Difficulty speaking properly
+suicide,suicide,Suicidal thoughts
+lowtemp,low temp,Abnormally low temperature
+fever,fever,Fevers
+chills,chills,Chills
+heat,heat,Heat intolerance
+cold,cold,Cold intolerance
+sweats,sweat,Night sweats
+insomnia,insomnia,Trouble falling/staying asleep
+hypersomnia,hypersomnia,Sleeping more than usual
+nightmares,nightmares,Nightmares
+exerciseproblm,exercise problem,Exercise intolerance
+excessivefatigue,excessive fatigue,Excessive fatigue
+burning,burning,Burning sensations
+tremor,tremor,Tremors
+vibration,vibration,Internal vibration
+numb,numb,"Tingling, pins and needles, numbness"
+neuropathy,neuropathy,Neuropathy
+seizures,seizures,Seizures
+abdompain,adbomen pain,Abdominal pain
+reflux,reflux,Acid reflux or heartburn
+diarrhea,diarrhea,Diarrhea
+constip,constipation,Constipation
+nausea,nausea,Nausea/vomiting
+noappetite,no appetite,Loss of appetite
+sorethroat,sore throat,Sore throat
+congested,congested,Congested or runny nose
+palpitations,palpitations,Palpitations
+neckthrob,neck throb,Bilateral neck throbbing
+costochondritis,costochondritis,Costochondritis
+cough,cough,Cough
+hemoptyisis,hemoptysis,Coughing up blood
+burnlungs,burning lungs,Cold or burning feeling in lungs
+swallow,swallow,Difficulty swallowing
+throatpain,throat pain,Throat pain
+throatlump,throat lump,Lump in throat
+throatphlegm,throat phlegm,Phlegm in back of throat
+postnasaldrip,postnasal drip,Postnasal drip
+runnynose,runny nose,Runny nose
+swollenlymphnodes,swollen lymph nodes,Swollen lymph nodes
+highhrrest,high HR rest,Tachycardia at rest
+highhrstand,high HR stand,Tachycardia after standing up
+wheezing,wheezing,Wheezing
+dyspnea,dyspnea,Shortness of breath
+boneaches,bone aches,Bone aches
+migraine,migraine,Migraine
+headache,headache,Headache
+calfcramps,calf cramps,Calf cramps
+pressurehead,pressure head,Pressure at base of head
+jawpain,jaw pain,Jaw pain
+jointpain,joint pain,Joint pain
+kidneypain,kidney pain,Kidney pain
+mouthsores,mouth sores,Mouth sores or sore tongue
+myalgia,myalgia,Muscle or body aches
+chestpain,chest pain,persistant chest pain or pressure
+painfulscalp,painful scalp,Painful scalp
+suddenchestpain,sudden chest pain,Sharp or sudden chest pain
+dysgeusia,dysgeusia,Changed sense of taste
+changesmell,change in smell,Changed sense of smell
+floaters,floaters,Floaters or flahses of light in vision
+lossofhearing,loss of hearing,Loss of hearing
+vissionloss,vision loss,Loss or decrease in quality of vision/blurry vision
+phantomsmells,phantom smells,Phantom smells
+phantomtastes,phantom tastes,Phantom tastes
+hallucination,hallucination,Hallucinations
+tinnitus,tinnitus,Tinnitus
+skinbruising,skin bruising,Skin bruising
+nails,nails,Change in nails
+toerash,toe rash,Tender or itchy rash on toes or foot
+lips,lips,Cracked or dry lips
+teeth,teeth,Dental problems
+discolorskin,discolored skin,Discoloration of skin
+dryskin,dry skin,Dry skin
+dandruff,dandruff,Dry scalp
+hairloss,hair loss,Hair loss
+itchiness,itchiness,Itchiness
+rashfoot,foot rash,Tender or itchy rash not on foot
+chilblains,chillblains,Chillblains on hands or feet
+thirst,thirst,Constant thirst
+voice,voice,Changes in voice
+ears,ears,Clogged ears
+dizziness,dizziness,Dizziness
+dryeyes,dry eyes,Dry eyes
+fatigue,fatigue,Fatigue
+menstruation,menstruation,Irregular or skipped menstrual cycles
+menstruationvolume,menstruation volume,Menstrual cycles that are heaver or lighter than normal
+newallergies,new allergies,New allergies
+eating,eating,Inability to eat or tolerate food
+swollenhandsorfeet,swollen hand/feet,Swollen hands/feet
+fainting,fainting,Fainting
+weakenedneck,weakened neck,Weakened neck
+label,status,status
