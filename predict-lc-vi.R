@@ -11,6 +11,8 @@ library(xgboost)
 set.seed(123)
 
 
+
+
 options <- commandArgs(trailingOnly = TRUE)
 
 papervarnames_file <- "lc-vi-paper-var-names.csv"
@@ -309,6 +311,8 @@ saveRDS(file=file.path(outdir, "results.rds"), list(results_gbm=results_gbm, res
 }
 
 
+
+
 true_names <- papervarnames_file %>% read_csv() %>% select(2,3)
 
 varimp_store_gbm <- lapply(varimp_store_gbm, function(x) x %>% left_join(true_names, by=c("var"="new_names")) %>% select(-var) %>% relocate(Overall, proper_names, id, s) %>% magrittr::set_colnames(c("Overall", "var", "id", "s")))
@@ -377,6 +381,81 @@ print(paste0("NUMBER OF FINAL VARIABLES IN GBM:::  ", final.n.vars.gbm))
 
 final.var.imp_gbm <- results_gbm %>% mutate(idx = 1:n()) %>% filter(n.vars == final.n.vars.gbm) %>% pull(idx) %>% varimp_store_gbm[[.]]
 
+### AUROC plot under construction
+
+ftsel <- final.var.imp_gbm %>% left_join(., papervarnames_file %>% read_csv()
+, by = c("var" = "proper_names")) %>% pull(new_names)
+
+dftmp <- "lc-vi/merged.csv" %>% read_csv() %>% select(c(ftsel, "status"))
+
+tg_gbm <- expand.grid(n.trees=c(50, 100, 150),
+	                    interaction.depth=c(2,3,4),
+	                    shrinkage=0.1,
+	                    n.minobsinnode=10)
+ctrl <- trainControl(method="repeatedcv",
+	                       number=cv_number,
+	                       repeats=cv_repeat,
+	                       verboseIter=TRUE,
+	                       savePredictions="final",
+	                       classProbs=TRUE,
+	                       index=createMultiFolds(dftmp$status, cv_number, cv_repeat),
+	                       summaryFunction=twoClassSummary)
+
+model_seq_gbm <- caret::train(status ~ .,
+	                            data=dftmp,
+	                            method="gbm",
+	                            metric="ROC",
+	                            tuneGrid=tg_gbm,
+	                            trControl=ctrl)
+
+fit <- model_seq_gbm$pred %>% 
+	    arrange(rowIndex) %>%
+	    group_by(rowIndex) %>%
+	    dplyr::summarize(obs=obs[1],
+	              prob=mean(LC)) %>%
+	    ungroup() %>% mutate(id = rowIndex) %>%
+	    select(id, obs, prob) 
+
+dat <- fit %>% mutate(class = ifelse(obs == "LC", 1, 0))
+
+rocobj <- roc(dat$class, dat$prob, direction = "<", ci=TRUE)
+
+df.roc <- data.frame(spec=(1-rocobj$specificities), sens=rocobj$sensitivities)
+
+lb <- rocobj$ci[1] 
+auc <- rocobj$ci[2] 
+ub <- rocobj$ci[3]
+
+lab.text <- paste0("AUC: ", auc %>% signif(2), " (", lb %>% signif(2), " - ", ub %>% signif(2) , ")")
+ann.text <- data.frame(spec=0.75, sens=0.05, label=lab.text, n=length(rocobj$cases))
+
+overall.roc <- ggplot(df.roc, aes(spec, sens)) +
+	    geom_line(size=1, color = "black") +
+	      scale_x_continuous(expand=c(0, 0.01),
+	                      breaks=c(0, 0.25, 0.5, 0.75, 1),
+	                      labels=as.character(
+	                          c("0", "0.25", "0.50", "0.75", "1.0"))) +
+	      scale_y_continuous(expand=c(0, 0.01),
+	                         labels=as.character(
+	                             c("0", "0.25", "0.50", "0.75", "1.0")))  +
+	      theme_classic(base_size=17) +
+	      theme(panel.background=element_blank(),
+	            panel.grid=element_blank(),
+	            legend.position="top",          axis.line.x.bottom=element_line(color="black"),
+	            strip.background=element_blank()) +
+	      xlab("1 - Specificity") + ylab("Sensitivity") + geom_text(data = ann.text,label = lab.text, size=5)
+
+
+gbm_roc_fig3 <- overall.roc
+
+dft <- final.var.imp_gbm %>% arrange((Overall)) %>% mutate(id = 1:n()) 
+gbm_final_sx_fig3 <- dft %>% ggplot(aes(x=factor(id), y=s)) + geom_col(alpha = 0.8, fill = "grey70") + theme_minimal() + theme(legend.position = "none") + scale_x_discrete(breaks = dft$id, labels = dft$var) + ylab("Percent Importance (%)") + theme(panel.grid = element_blank()) + theme(panel.background  = element_blank(), panel.border = element_rect(color = "black", fill = "transparent")) +  scale_y_continuous(breaks = pretty_breaks(n = 6), limits = c(0, 20)) + ggtitle("") + theme(axis.title = element_text(hjust = 0.5, size = 12)) + theme(axis.text.y = element_text(size = 10), axis.ticks.x = element_line(color = "grey80"), axis.text.x = element_text(size = 10)) + xlab("Symptom") + coord_flip()
+
+cowplot::plot_grid(gbm_roc_fig3, gbm_final_sx_fig3, labels = c("A", "B"), label_size = 24, nrow = 1, rel_widths = c(1, 1)) %>% ggsave(filename = "lc-vi/fig3.pdf", plot = ., device = cairo_pdf, units = "in", height = 5, width = 12)
+
+####
+
+
 gbm_roc_n <- results_gbm %>% ggplot(aes(x=n.vars, y=auc)) + geom_point(size = 2.25) + geom_line(size = 0.85) + geom_errorbar(aes(ymin=lb, ymax = ub), size = 0.45, width = 0.1, color="grey80") + theme_minimal() + theme(panel.grid = element_blank(), panel.border = element_rect(color="black", fill = "transparent")) + theme(axis.text = element_text(size = 12), axis.title = element_text(size = 18)) + ylab("AUC w/ 95% CI") + xlab("Number of variables\nin gbm method") + geom_vline(xintercept = final.n.vars.gbm, color="red", linetype = "dashed", size = 0.3) + theme(panel.grid.major.y = element_line(color = "grey80")) + theme(axis.ticks.x = element_line(color = "black"))
 
 gbm_all_sx <- sx_varimp_plot(varimp_store_gbm[[1]] %>% mutate(colstatus = ifelse(id <= final.n.vars.gbm, "Yes", "No")) )
@@ -390,7 +469,7 @@ gbm_final_sx <- sx_varimp_plot(final.var.imp_gbm)
 phat <- results_gbm %>% mutate(idx = 1:n()) %>% filter(n.vars == final.n.vars.gbm) %>% pull(idx) %>% phats_gbm[[.]] %>% cbind(., merged) %>% as_tibble()
 
 
-phat_figa <- phat %>% select(LC, status) %>% arrange(LC) %>% mutate(idx = 1:n()) %>% ggplot(aes(x=idx, y=LC, color = status)) + geom_point(size = 2) + theme_minimal() + theme(panel.border = element_rect(color = "black", fill = "transparent"), panel.grid = element_blank()) + ylab("Predicted Probability of Patient\nHaving Long Covid") + xlab("") + theme(axis.text.x = element_blank()) + theme(legend.position = "bottom") + labs(color = "Patient Status") + theme(axis.title.y = element_text(size = 15), axis.text.y = element_text(size = 12), legend.text = element_text(size = 14), legend.title = element_text(size = 15)) + scale_color_manual(values = c("#df8f44", "#374e55")) + scale_y_continuous(limits = c(0,1), breaks = c(0, 0.25, 0.5, 0.75, 1))
+phat_figa <- phat %>% select(LC, status) %>% arrange(LC) %>% mutate(idx = 1:n()) %>% ggplot(aes(x=idx, y=LC, color = status)) + geom_point(size = 2) + theme_minimal() + theme(panel.border = element_rect(color = "black", fill = "transparent"), panel.grid = element_blank()) + ylab("Predicted Probability of Patient\nHaving Long Covid") + xlab("") + theme(axis.text.x = element_blank()) + theme(legend.position = "bottom") + labs(color = "Patient Status") + theme(axis.title.y = element_text(size = 15), axis.text.y = element_text(size = 12), legend.text = element_text(size = 14), legend.title = element_text(size = 15)) + scale_color_manual(values = c("LC" = "#df8f44", "VI" = "#374e55"), labels = c("LC" = "LC", "VI" = "PVS")) + scale_y_continuous(limits = c(0,1), breaks = c(0, 0.25, 0.5, 0.75, 1))
 
 #A calibration bar plot showing the observed % of LC vs PVS within each decile of predicted p_hat. And if possible, compare the symptoms between the ppl in the first and 10th deciles.
 
@@ -405,7 +484,7 @@ vars_less_than_0.05 <- decile_pvals %>% as_tibble() %>% mutate(var = decile_sx %
 
 calib_comp <- phat %>% mutate(decile  = ntile(LC, 10)) %>% relocate(decile) %>% filter(decile %in% c(1,10)) %>% group_by(decile) %>% select(-status) %>% summarise(across(everything(), mean)) %>% select(-c(LC, VI)) %>% pivot_longer(-c(decile)) %>% filter(name %in% (vars_less_than_0.05 %>% pull(var)))
 
-calib_comp %>% mutate(name = factor(name, levels = (calib_comp %>% group_by(name) %>% summarize(v = value[decile == 1] - value[decile == 10]) %>% arrange((v)) %>% pull(name)))) %>% ggplot(aes(x=name, y = value, color = factor(decile), fill  = factor(decile), group = factor(decile))) + geom_bar(position = "dodge", stat = "identity") + theme_minimal() + 
+calib_comp %>% mutate(name = factor(name, levels = (calib_comp %>% group_by(name) %>% summarize(v = value[decile == 1] - value[decile == 10]) %>% arrange((v)) %>% pull(name)))) %>% ggplot(aes(x=name, y = value, color = factor(decile), fill  = factor(decile), group = factor(decile))) + geom_bar(position = "dodge", stat = "identity") + theme_minimal() 
 
 mapping_calib <- calib %>% select(decile, xlabel) %>% distinct() %>% arrange(decile)
 
@@ -414,14 +493,20 @@ phat_figb <- calib %>% mutate(pct_LC = round((s/n)*100, 2)) %>% ggplot(aes(x=dec
 
 calib_comp <- calib_comp %>% left_join(true_names, by = c("name" = "new_names")) %>% select(-name) %>% magrittr::set_colnames(c("decile", "value", "name")) %>% relocate(decile, name, value)
 
-phat_fige <- calib_comp %>% mutate(name = factor(name, levels = (calib_comp %>% group_by(name) %>% summarize(v = value[decile == 1] - value[decile == 10]) %>% arrange((v)) %>% pull(name)))) %>% ggplot(aes(x=name, y = value, color = factor(decile), fill  = factor(decile), group = factor(decile))) + geom_bar(position = "dodge", width = 0.6, stat = "identity") + theme_minimal() + xlab("") + ylab("Frequency of Symptom\nin Decile") + theme(panel.border = element_rect(color = "black", fill = "transparent"), panel.grid = element_blank()) + theme(axis.text.x = element_text(size = 12, angle = 60, hjust = 1)) + theme(legend.position = "right") + labs(color = "Decile", fill = "Decile") + theme(axis.title.y = element_text(size = 15), axis.text.y = element_text(size = 12), legend.text = element_text(size = 14), legend.title = element_text(size = 15)) + scale_fill_manual(values = c("#df8f44","#374e55") %>% rev(), labels = c("1st\nP(LC) = 0.14 - 0.23", "10th\nP(LC) = 0.95 - 0.99")) + scale_color_manual(values = c("#df8f44", "#374e55") %>% rev(), labels = c("1st\nP(LC) = 0.14 - 0.23", "10th\nP(LC) = 0.95 - 0.99")) + scale_y_continuous(limits = c(0,1), breaks = c(0, 0.25, 0.5, 0.75, 1)) + theme(axis.ticks.x = element_line(color = "black"))
+phat_fige <- calib_comp %>% mutate(name = factor(name, levels = (calib_comp %>% group_by(name) %>% summarize(v = value[decile == 1] - value[decile == 10]) %>% arrange((v)) %>% pull(name)))) %>% ggplot(aes(y=name, x = value, color = factor(decile), fill  = factor(decile), group = factor(decile))) + geom_bar(position = "dodge", width = 0.6, stat = "identity") + theme_minimal() + ylab("") + xlab("Frequency of Symptom\nin Decile") + theme(panel.border = element_rect(color = "black", fill = "transparent"), panel.grid = element_blank()) + theme(axis.text.y = element_text(size = 10)) + theme(legend.position = c(0.75, 0.5)) + labs(color = "Decile", fill = "Decile") + theme(axis.title.x = element_text(size = 12), axis.text.y = element_text(size = 10), legend.text = element_text(size = 8), legend.title = element_text(size = 10)) + scale_fill_manual(values = c("#df8f44","#374e55") %>% rev(), labels = c("1st\nP(LC) = 0.14 - 0.23", "10th\nP(LC) = 0.95 - 0.99")) + scale_color_manual(values = c("#df8f44", "#374e55") %>% rev(), labels = c("1st\nP(LC) = 0.14 - 0.23", "10th\nP(LC) = 0.95 - 0.99")) + scale_x_continuous(limits = c(0,1), breaks = c(0, 0.25, 0.5, 0.75, 1)) + theme(axis.ticks.y = element_line(color = "black"))
 
+
+
+phat_fige_long <- calib_comp %>% mutate(name = factor(name, levels = (calib_comp %>% group_by(name) %>% summarize(v = value[decile == 1] - value[decile == 10]) %>% arrange((v)) %>% pull(name)))) %>% ggplot(aes(y=name, x = value, color = factor(decile), fill  = factor(decile), group = factor(decile))) + geom_col(position = "dodge", width = 0.6) + theme_minimal() + ylab("") + xlab("Frequency of Symptom in Decile") + theme(panel.border = element_rect(color = "black", fill = "transparent"), panel.grid = element_blank()) + theme(axis.text.y = element_text(size = 10, hjust = 1)) + theme(legend.position = "bottom") + labs(color = "Decile", fill = "Decile") + theme(axis.title.x = element_text(size = 15), axis.text.x = element_text(size = 12), legend.text = element_text(size = 10), legend.title = element_text(size = 10)) + scale_fill_manual(values = c("#df8f44","#374e55") %>% rev(), labels = c("1st Decile\nP(LC) = 0.14 - 0.23", "10th Decile\nP(LC) = 0.95 - 0.99")) + scale_color_manual(values = c("#df8f44", "#374e55") %>% rev(), labels = c("1st Decile\nP(LC) = 0.14 - 0.23", "10th Decile\nP(LC) = 0.95 - 0.99")) + scale_x_continuous(limits = c(0,1), breaks = c(0, 0.25, 0.5, 0.75, 1)) + theme(axis.ticks.x = element_line(color = "black")) + guides(color = guide_legend(nrow = 2), fill = guide_legend(nrow = 2)) + theme(legend.title = element_blank())
+
+
+ggsave(plot=phat_fige, filename="lc-vi/phat-fig-e.pdf", device = cairo_pdf, units = "in", width = 6, height = 9)
 
 #A histogram of everyone
 phat_figc <- phat %>% select(LC, status) %>% ggplot(aes(x=LC, y = ..scaled..)) + geom_density(color = "grey40", fill = "grey70", adjust = 1, alpha = 0.8) + theme_minimal() + theme(panel.border = element_rect(color = "black", fill = "transparent"))  + theme(panel.grid = element_blank()) + scale_x_continuous(limits = c(0,1), breaks = seq(0, 1, .25)) + labs(y = "Density", x = "Estimated Probability of Having Long COVID") + theme(axis.text = element_text(size = 12), axis.title = element_text(size = 15), legend.text = element_text(size = 12), legend.title = element_text(size = 15)) 
 
 #A histogram of p_hat for LC and PVS respectively on the same plot.
-phat_figd <- phat %>% select(LC, status) %>% ggplot(aes(x=LC, y = ..scaled.., fill = status)) + geom_density(color = "grey40", adjust = 1, alpha = 0.75) + theme_minimal() + theme(panel.border = element_rect(color = "black", fill = "transparent"))  + theme(panel.grid = element_blank()) + scale_x_continuous(limits = c(0,1), breaks = seq(0, 1, .25)) + labs(y = "Density", x = "Estimated Probability of Having Long COVID", fill = "Patient\nStatus") + theme(axis.text = element_text(size = 12), axis.title = element_text(size = 15), legend.text = element_text(size = 12), legend.title = element_text(size = 15)) + scale_fill_manual(values = c("#df8f44", "#374e55"))
+phat_figd <- phat %>% select(LC, status) %>% ggplot(aes(x=LC, y = ..scaled.., fill = status)) + geom_density(color = "grey40", adjust = 1, alpha = 0.75) + theme_minimal() + theme(panel.border = element_rect(color = "black", fill = "transparent"))  + theme(panel.grid = element_blank()) + scale_x_continuous(limits = c(0,1), breaks = seq(0, 1, .25)) + labs(y = "Density", x = "Estimated Probability of Having Long COVID", fill = "Patient\nStatus") + theme(axis.text = element_text(size = 12), axis.title = element_text(size = 15), legend.text = element_text(size = 12), legend.title = element_text(size = 15)) + scale_fill_manual(values = c("LC" = "#df8f44", "VI" = "#374e55"), labels = c("LC" = "LC", "VI" = "PVS"))
 
 
 
